@@ -1,0 +1,148 @@
+#!/bin/sh
+
+#Info
+#=======================
+#	File: set_fwprofile
+#	Name: RHEL-7 Set Firewall Profile
+#
+#	Version: 2.07
+# 	*version is major.minor format
+# 	*major is updated when new capability is added
+# 	*minor is updated on fixes and improvements
+
+#History
+#=======================
+#	01Jan2016 v1.00
+#		J. Doe
+#		*Script created
+#		
+# 	30May2015 v2.06 
+#		Andrew Benson
+#		Frank Vasko
+#		*Fenamed from fw_ask
+#
+# 	08Dec2016 v2.06 
+#		Andrew Benson
+#		Frank Vasko
+#		*Function added to clear vmware nat entries
+#	
+#	20Dec2016 v2.07
+#		Christopher Voss
+#		*Updated file header to standard format
+
+#Description 
+#=======================
+# This script changes the Firewall profile 
+
+
+cat <<HELP
+Five major firewall policies (profiles) are provided by this script:
+
+ 1) Default -- Allow all traffic outbound, deny all traffic inbound. 
+ 2) Deny    -- Deny all traffic through the firewall.
+ 3) Share   -- Set the default policy and allow for inbound connections
+               to an SMB share.
+ 4) Scan    -- Set the default policy but limit based on files in 
+               /etc/target.hosts and /etc/trusted.hosts.
+ 5) Disable -- Disable the firewall completely. 
+ 6) Forward -- Port forward through to Virtual Machine hosts.
+ 7) Save    -- Save the current firewall state/configuration.
+ 8) Status  -- Display the firewall status.
+ 9) Quit    -- Exit this script.
+
+HELP
+
+vmnat_clear()
+{
+	count=0
+	newcount=0
+	
+	#These 3 lines clear out any portforwarding rules from nat.conf
+        count=$(grep "incomingudp" /etc/vmware/vmnet8/nat/nat.conf -n | cut -d':' -f1)
+        newcount=$(($count - 2))
+
+	if [ $newcount -gt 62 ]; then
+		#echo $newcount	
+		sed -i "61, $newcount d" /etc/vmware/vmnet8/nat/nat.conf
+	fi
+}
+
+FW="/usr/local/sbin/set_firewall"
+PS3="Choice? "
+OPTIONS="Default Deny Share Scan Disable Forward Save Status Quit"
+portForward="/usr/local/sbin/set_vmPortForward"
+select opt in $OPTIONS; do
+	if [ "$opt" = "Quit" ]; then
+                echo 
+		echo "Exiting to shell."
+                echo 
+                echo "The firewall script can be run manually for custom options."
+                echo 
+		break
+	elif [ "$opt" = "Status" ]; then
+		echo
+		sudo iptables -nvL
+	elif [ "$opt" = "Save" ]; then
+                echo 
+		echo "Saving the current firewall state/configuration."
+		sudo iptables-save > /etc/sysconfig/iptables
+	elif [ "$opt" = "Default" ]; then
+                echo 
+		echo "Setting the default policy:"
+		vmnat_clear
+		$FW		
+	elif [ "$opt" = "Deny" ]; then
+                echo 
+		echo "Denying all traffic:"
+		vmnat_clear
+		$FW -D
+	elif [ "$opt" = "Disable" ]; then
+                echo 
+		echo "Disabling firewall rules (allows all traffic):"
+		vmnat_clear
+		$FW -A
+	elif [ "$opt" = "Forward" ]; then
+		echo
+		$portForward
+		#echo "Port forwarding option not implimented yet."
+	elif [ "$opt" = "Scan" ]; then
+                echo 
+		echo "Setting scan policy:"
+		if [ ! -e /etc/trusted.hosts ] || [ ! -e /etc/target.hosts ]; then
+                        echo 
+			echo "Make sure /etc/trusted.hosts and /etc/target.hosts exist."
+			echo "Press any key to exit."
+			read 
+			exit
+		fi
+		#cat /etc/target.hosts > /etc/outbound.hosts && cat /etc/trusted.hosts >> /etc/outbound.		hosts
+		#$FW -ih /etc/trusted.hosts -oh /etc/outbound.hosts
+		$FW -tt
+	elif [ "$opt" = "Share" ]; then
+                echo 
+		echo "Setting share policy:"
+		vmnat_clear
+		$FW -it "22,139,445" -ih /etc/trusted.hosts
+		# -oh /etc/trusted.hosts
+	else
+                echo 
+		echo "Not a valid option."
+	fi
+		
+cat <<MENU
+
+   MENU
+-----------
+1) Default (LOCAL ONLY)
+2) Deny (LOCAL ONLY)
+3) Share (REMOTE/LOCAL)
+4) Scan (REMOTE/LOCAL)
+5) Disable
+6) Forward
+7) Save
+8) Status
+9) Quit
+MENU
+echo 
+done
+

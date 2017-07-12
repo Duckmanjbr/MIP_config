@@ -1,0 +1,312 @@
+#!/bin/sh
+
+#Info
+#=======================
+#	File: set_classification
+#	Name: RHEL-7 Set Classification
+#
+#	Version: 2.01
+# 	*version is major.minor format
+# 	*major is updated when new capability is added
+# 	*minor is updated on fixes and improvements
+
+#History
+#=======================		
+#	30Mar2015 v1.06 
+#		Andrew Benson
+#		Frank Vasko
+#		*Modified to use classification-banner.py script and use custom classification levels
+#
+# 	29May2015 v1.06 
+#		Andrew Benson
+#		Frank Vasko
+#		*Renamed from change_classification
+#		*support directory renamed /usr/local/scripts/set_classification
+#
+# 	09Dec2016 v2.00
+#		I.A. Wilds
+#		*Added menus for ease of use.
+#		*User defined variable for host OS or VM name
+# 		*Values include mip2, cva, adcco, ccro, spt, mip1, p2
+#	
+#	20Dec2016 v2.01
+#		Christopher Voss
+#		*Updated file header to standard format
+
+#Description 
+#=======================
+# This script changes the classification of the classification banner 
+
+
+#_________________________________________________
+
+scriptdir="/usr/local/scripts/set_classification"
+sysname=$(head -1 $scriptdir/sysname)
+level=0
+classification=0
+#_________________________________________________
+echo
+
+# Check to see who ran the script; only logged in usesr can change the background wallpaper
+#if [ "$(logname)" != "$LOGNAME" ]; then
+#	echo "This script must be run as the logged in user '$(logname)', not '$LOGNAME'."
+#	echo
+#	exit
+#fi
+
+# Prompt user for classification level
+if [ -z $1 ]; then
+echo "____________________________________________"
+echo "The current version of this script is v2.01"
+echo "____________________________________________"
+sleep 1
+echo
+#classMenu()
+#{
+clear
+echo "***********************************************************************"
+echo "***********************************************************************"
+echo "*********C***L***A***S***S***I***F***I***C***A***T***I***O***N*********"
+echo "***********************************************************************"
+echo "***********************************************************************"
+echo "+                                                                     +"
+echo "+                 [1] unclass                                         +"
+echo "+                                                                     +"
+echo "+                 [2] confidential                                    +"
+echo "+                                                                     +"
+echo "+                 [3] secret                                          +"
+echo "+                                                                     +"
+echo "+                 [4] top secret                                      +"
+echo "+                                                                     +"
+echo "+                 [5] tssci                                           +"
+echo "+                                                                     +"
+echo "+                 [6] custom                                          +"
+echo "+                                                                     +"
+echo "+                 [x] exit                                            +"
+echo "+                                                                     +"
+echo "+                                                                     +"
+echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+echo 
+read -p "Please select a classification level: " classification
+
+case $classification in
+        1) classification="unclass" ;;
+        2) classification="confidential" ;;
+        3) classification="secret" ;;
+        4) classification="topsecret" ;;
+        5) classification="tssci" ;;
+        6) classification="custom" ;;
+        x|X) exit;;
+
+
+
+esac
+#}
+
+	#echo "Please choose one of the following classification levels:"
+#cat <<LEVELS
+#unclass
+#confidential
+#secret
+#topsecret
+#tssci
+#custom
+#LEVELS
+#	echo -n "?) "
+	#read classification
+	#echo
+#else
+#	classification=$1
+fi
+#}
+
+
+# Set bgcolor; if custom, prompt user for custom info
+case $classification in
+	"unclass") bgcolor="green";;
+	"confidential") bgcolor="blue";;
+	"secret") bgcolor="red";;
+	"topsecret") bgcolor="orange";;
+	"tssci") bgcolor="yellow";;
+	"custom")
+echo "NOTE: Custom background colors are based on predefined desktop backgrounds. If a custom color is not defined, pick the closest defined background color and then manually edit the /etc/classification-banner config file to set a different banner background color and/or foreground color; then kill and restart the /usr/local/bin/classification-banner.py script."
+		echo
+#_________________________________________________________________________________________
+#		echo "Please choose one of the following custom background colors:"
+#cat <<BGSELECT
+#black
+#blue
+#brown
+#green
+#grey
+#orange
+#purple
+#red
+#white
+#yellow
+#BGSELECT
+#		echo -n "?) "
+#		read bgcolor
+#		echo
+#		case $bgcolor in
+#			black|blue|brown|green|grey|orange|purple|red|white|yellow);;
+#			*)
+#				echo "The specified background color is not defined."
+#				echo "Background color set to default (green)."
+#				bgcolor="green"
+#				echo "Press enter to continue."
+#				read;;
+#		esac
+clear
+echo "*******************************************************************"
+echo "*******************************************************************"
+echo "**************B***A***C***K***G***R***O***U***N***D****************"
+echo "*******************************************************************"
+echo "*******************************************************************"
+echo "+                                                                 +"
+echo "+                          [1] black                              +"
+echo "+                          [2] blue                               +"
+echo "+                          [3] brown                              +"
+echo "+                          [4] green                              +"
+echo "+                          [5] grey                               +"
+echo "+                          [6] orange                             +"
+echo "+                          [7] purple                             +"
+echo "+                          [8] red                                +"
+echo "+                          [9] white                              +"
+echo "+                         [10] yellow                             +"
+echo "+                          [x] Exit                               +"
+echo "+                                                                 +"
+echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+echo
+read -p "Please select a custom background color: " bgcolor
+
+	case $bgcolor in
+		1) bgcolor="black" ;;
+		2) bgcolor="blue" ;;
+		3) bgcolor="brown" ;;
+		4) bgcolor="green" ;;
+		5) bgcolor="grey" ;;
+		6) bgcolor="orange" ;;
+		7) bgcolor="purple" ;;
+		8) bgcolor="red" ;;
+		9) bgcolor="white" ;;
+		10) bgcolor="yellow" ;;
+		x|X) exit ;;
+	esac
+#echo "$bgcolor"
+#__________________________________________________________________________________________
+#		echo "Please choose one of the following custom foreground (text) colors:"
+#cat <<FGSELECT
+#black
+#red
+#white
+#FGSELECT
+#		echo -n "?) "
+#		read fgcolor
+#		echo
+#		case $fgcolor in
+#			black|red|white);;
+#			*)
+#				echo "The specified foreground color is not defined."
+#				echo "Foreground (text) color set to default (black)."
+#				fgcolor="black"
+#			echo "Press enter to continue."
+#			read;;
+#		esac
+clear
+echo "________________________________________________"
+echo "|                                              |"
+echo "|              foreground                      |"
+echo "|                                              |"
+echo "|______________________________________________|"
+echo "|                                              |"
+echo "|                [1] black                     |"
+echo "|                                              |"
+echo "|                [2] red                       |"
+echo "|                                              |"
+echo "|                [3] white                     |"
+echo "|                                              |"
+echo "|                [x] Exit                      |"
+echo "|                                              |"
+echo "|______________________________________________|"
+echo 
+read -p "PLease choose select a custom foreground (text) color: " fgcolor
+
+	case $fgcolor in
+		1) fgcolor="black";;
+		2) fgcolor="red" ;;
+		3) fgcolor="white" ;;
+		x|X) exit ;;
+	esac
+#echo "$fgcolor"
+#____________________________________________________________________________________________
+		echo "Please enter the classification level message (i.e., UNCLASSIFIED//FOUO):"
+		echo -n "?) "
+		read classmsg
+		echo
+cat <<EOT > $scriptdir/classification-banner-custom
+message='$classmsg'
+fgcolor='$fgcolor'
+bgcolor='$bgcolor'
+face='liberation-sans'
+size='small'
+weight='bold'
+show_top=True
+show_bottom=False
+EOT
+;;
+	*)
+		echo "Classification level $classification is not defined."
+		echo "Classification not changed!"
+		echo "Press enter to exit."
+		read
+		exit;;
+esac
+
+# Error message if classification file is missing; exit script
+if [ ! -f $scriptdir/classification-banner-$classification ]; then
+	echo "Configuration file $scriptdir/classification-banner-$classification is missing."
+	echo "Classification not changed!"
+	echo "Press enter to exit."
+	read
+	exit
+fi
+
+# Error message if background file is missing; exit script
+if [ ! -f $scriptdir/$sysname-$bgcolor.jpg ]; then
+	echo "Configuration file $scriptdir/$sysname-$bgcolor.jpg is missing."
+	echo "Classification not changed!"
+	echo "Press enter to exit."
+	read
+	exit
+fi
+
+# Copy /etc/classification-banner config for selected classification
+sudo cp $scriptdir/classification-banner-$classification /etc/classification-banner
+sudo cp $scriptdir/cvah-logo-$bgcolor.png /usr/local/share/pixmaps/cvah-logo.png
+
+# Create desktop background symbolic link
+sudo ln -sf $scriptdir/$sysname-$bgcolor.jpg /usr/share/backgrounds/$sysname-background.jpg
+
+# Create grub menu background
+sudo cp $scriptdir/$sysname-$bgcolor.jpg /boot/grub2/$sysname-background.jpg
+
+# Restart the classification-banner.py script
+GREP_VAL=$(ps aux | grep '[/]usr/bin/python /usr/local/bin/classification-banner.py')
+AWK_VAL=$(echo $GREP_VAL | awk '{print $2}')
+
+#echo "Grep Val: [$GREP_VAL]"
+#echo "After awk: [$AWK_VAL]" 
+if [ "$AWK_VAL" == "" ]; then 
+	/usr/local/bin/classification-banner.py &
+else 
+	sudo kill $AWK_VAL
+	/usr/local/bin/classification-banner.py &
+fi
+# Set the gnome desktop background
+#gconftool-2 --type string --set /desktop/gnome/background/picture_filename /usr/share/backgrounds/$sysname-background.jpg
+gsettings set org.gnome.desktop.background picture-uri "none"
+sleep 1
+gsettings set org.gnome.desktop.background picture-uri "file:///usr/share/backgrounds/$sysname-background.jpg"
+echo "Classification banner & background successfully changed to $classification."
+echo

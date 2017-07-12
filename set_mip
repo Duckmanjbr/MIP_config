@@ -1,0 +1,194 @@
+#!/bin/sh
+
+#Info
+#====
+#	file: set_mip
+# 	name: RHEL-7 Setup Script
+
+#	version: 1.02
+# 		*version is major.minor format
+# 		*major is update when new capability is added
+# 		*minor is update on fixes & improvementsements
+
+#History
+#=======
+# 	29May2016 v1.00
+#		Daniel Bentz( daniel.bentz@us.af.mil )
+#		Kyle Wilson( kyle.wilson.19@us.af.mil )
+#		Dread Pirate( jason.roberts.14@us.af.mil )
+#		*Created to automate MIP setup on RHEL-7 for network connectivity and firewall rules
+
+#	02Dec2016 v1.01
+#		Dread Pirate( jason.roberts.14@us.af.mil )
+#		*Updated to break out networking to "set_networking" script" and add shares
+
+#	20Dec2016 v1.02
+#		Czerwinski
+#		*Updated file header to standard format
+
+#Description
+#===========
+
+
+#Notes
+#=====
+
+
+######################
+#Script Variables
+restart_option=0
+SET_CLASSIFICATION="/usr/local/sbin/set_classification"
+SET_FWPROFILE="/usr/local/sbin/set_fwprofile"
+SET_NETWORKING="/usr/local/sbin/set_networking"
+SET_NTWKSHARE="/usr/local/sbin/set_smbconfig.py"
+versionNum="1.02"
+######################
+
+alias ll='ls -al --color=auto'
+
+#main_menu
+mainmenu()
+{
+	clear
+	echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+	echo "+                                                                      +"
+	echo "+                  Red Hat Setup Script $versionNum                           +"
+	echo "+                                                                      +"
+	echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+	echo "+                                                                      +"
+	echo "+        [ 1 ] Firewall Options                                        +"
+	echo "+                                                                      +"
+	echo "+                                                                      +"
+	echo "+        [ 2 ] Network Configuration (IP and Mac)                      +"
+	echo "+                                                                      +"
+	echo "+                                                                      +"
+	echo "+        [ 3 ] HostName Configuration                                  +"
+	echo "+                                                                      +"
+	echo "+                                                                      +"
+	echo "+        [ 4 ] Network Shares                                          +"
+	echo "+                                                                      +"
+	echo "+                                                                      +"
+	echo "+        [ 5 ] Classification Configuration                            +"
+	echo "+                                                                      +"
+	echo "+                                                                      +"
+	echo "+        [ Q ] Quick Setup Configuration (Firewall,Network,Hostname)   +"
+	echo "+                                                                      +"
+	echo "+                                                                      +"
+	echo "+        [ X ] Exit Script                                             +"
+	echo "+                                                                      +"
+	echo "+                                                                      +"
+	echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+	echo ""
+
+	read -p "Please make a Selection: " mainmenu_option
+	case $mainmenu_option in
+		1) clear && $SET_FWPROFILE && mainmenu;;
+		2) $SET_NETWORKING && mainmenu;; 
+		3) hostname_func && restart && mainmenu;;
+		4) $SET_NTWKSHARE && mainmenu;;
+		5) clear && $SET_CLASSIFICATION && mainmenu;;
+		q|Q) quickSetup && mainmenu;;
+		x|X) break ;;
+		*) echo "Invalid input" && sleep 1 && mainmenu;;
+	esac
+}
+
+quickSetup()
+{
+	clear
+	echo
+	echo
+	echo "**************************"
+	echo "*       Firewall         *"
+	echo "**************************"
+	echo
+	$SET_FWPROFILE
+	echo
+	echo
+	echo "**************************"
+	echo "*  Network Configuration *"
+	echo "**************************"
+	echo
+	$SET_NETWORKING
+	echo
+	echo
+	echo "**************************"
+	echo "* Hostname Configuration *"
+	echo "**************************"
+	echo
+	hostname_func
+	restart 
+}
+
+
+#Check for running script as root
+checkroot()
+{
+	if [ `whoami` != "root" ]; then
+		echo "This Script must be run as root"
+		sleep 1
+		exit
+	fi
+}
+
+
+#change hostname
+hostname_func ()
+{
+	read -p "Would you like to change the hostname? [`hostname`] [y/n] " hostname_option
+	if [ $hostname_option == "y" ]; then
+
+		read -p "What would you like the new hostname to be? " newname
+		if [ $newname != "" ]; then
+			read -p "Would you like to append the new name to the origanal hostname? [y/n] " append_option
+			if [ $append_option == "y" ]; then
+				sed -i "s/$HOSTNAME/$HOSTNAME\_$newname/" /etc/hostname
+				echo "The new hostname will be `hostname`_$newname"
+				echo 
+			elif [ $append_option == "n" ]; then
+				sed -i "s/$HOSTNAME/$newname/" /etc/hostname
+				echo "The new hostname will be $newname"
+				echo 
+
+			else
+				echo "Invalid input!  Please enter a valid option... "
+				hostname_func
+			fi
+
+			read -p "System must be restarted to take affect.  Restart after script completion? [y/n] " restart_option
+
+			if [ $restart_option == "y" ]; then
+				echo "Restarting in 5 seconds..."
+				sleep 5
+			elif [ $restart_option == "n" ]; then
+				echo "No restart scheduled."
+			else
+				echo "Invalid input!  Please enter a valid option... "
+
+				hostname_func
+			fi
+		fi
+
+	elif [ $hostname_option == "n" ]; then
+		echo "No hostname change"
+		sleep 2
+
+	else
+		echo "Invalid input!  Please enter a valid option... "
+		hostname_func
+	fi
+}
+
+#Restart function
+restart()
+{
+	if [ $restart_option == "y" ]; then
+		shutdown -r now
+	fi
+}
+
+
+#script functions
+checkroot
+mainmenu
+

@@ -1,0 +1,160 @@
+#!/bin/sh
+
+#Info
+#====
+#	file: set_vmPortForward
+# 	name: RHEL-7 VM Port Forwarding
+
+#	version: 1.01
+# 		*version is major.minor format
+# 		*major is update when new capability is added
+# 		*minor is update on fixes & improvements
+
+#History
+#=======
+# 	07Dec2016 v1.00
+#		I.A. Wild
+#		T. Czerwinski
+#		*created
+
+#	20Dec2016 v1.01
+#		Czerwinski
+#		*Updated file header to standard format
+
+
+#Description
+#===========
+
+
+#Notes
+#=====
+#	Port forwarding to a VM must be configured using a vmware script rather than IPTABLES
+#	These changes may also be accomplished using the VMWARE GUI followed by restarting the guest
+
+
+#---------------------------------
+vmIp=0
+vmPort=0
+extPort=0
+correct=0
+#---------------------------------	
+
+
+#input the ports and ip to allow port forwarding to VM
+main_menu() 
+{
+	read -p "What is the IP of the VM you need to port forward to? " vmIp
+
+	read -p "What is the port of the VM to forward to?" vmPort
+
+	read -p "What is the port of the external interface you need to forward from? " extPort
+
+	echo "forward $extPort to $vmIp:$vmPort ?"
+	echo
+	read -p "Is this correct? (y or n) " correct
+
+	if [ $correct == "y" ]; then
+		config_vmware
+	fi
+	if [ $correct == "n" ]; then 
+		main_menu
+	fi
+}
+
+#Verify inputs and write rule to vmware nat script
+config_vmware()
+{
+	sed -i "/#8080 = 172.16.3.128:80/a $extPort = $vmIp:$vmPort" /etc/vmware/vmnet8/nat/nat.conf  
+	vmware-networks --stop
+	vmware-networks --start
+}
+
+hostPortfor()
+{
+#----------------------------
+SNAT=0
+DNAT=0
+dport=0
+sock=0
+sock1=0
+extPort=0
+protocol=0
+#----------------------------
+#flush the iptables rules.
+#iptables -F
+
+#flush the iptables nat rules.
+#iptables -t nat -F
+
+#echo "POSTROUTING changed"
+#below are various POSTROUTING rules.
+#iptables -t nat -A POSTROUTING ! -d 10.8.33.0/24 -o em1 -j SNAT --to-source 172.16.0.1
+#iptables -A POSTROUTING -t nat -p tcp -m tcp -s 10.8.33.130 --sport 22 -j SNAT --to-source 172.16.0.1
+read -p "What is the IP of your external interface (i.e. em1)?  " SNAT
+echo
+read -p "What is the IP of your internal gateway (i.e. vmnet8)? " DNAT
+echo
+read -p "What is the port you need forwarded from the external interface? " extPort
+echo
+read -p "What is the port you want to forward to on your internal machine? " dport
+echo
+read -p "what protocol is the destination port you just specified? (i.e. tcp or udp) " protocol
+echo
+sock=$SNAT":"$extPort
+sock1=$DNAT":"$dport
+echo "your socket is $sock"
+ 
+iptables -t nat -A POSTROUTING -o em1 -p $protocol --dport $dport -d $DNAT -j SNAT --to-source $SNAT
+#iptables -t nat -A POSTROUTING -o em1 -p tcp --dport 22 -d 10.8.33.130 -j SNAT --to-source 172.16.0.1
+#iptables -t nat -A POSTROUTING -o em1 -p tcp --dport 22 -d 10.8.33.130 -j SNAT --to-source 172.16.0.1:22
+
+
+echo
+#echo "PREROUTING changed"
+#below are various PREROUTING rules.
+iptables -t nat -A PREROUTING -i em1 -p $protocol --dport $dport -j DNAT --to $sock1
+#iptables -t nat -A PREROUTING -i em1 -p tcp --dport 22 -j DNAT --to 10.8.33.130:22
+#iptables -t nat -A PREROUTING -i em1 -p tcp --dport 22 -j DNAT --to-destination 10.8.33.130
+
+#below are various FORWARD rules.
+iptables -A FORWARD -p $protocol -d $DNAT --dport $dport -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+#iptables -A FORWARD -p tcp -d 10.8.33.130 --dport 22 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+#iptables -A FORWARD -i em1 -o vmnet8 -p tcp --syn --dport 22 -m conntrack --ctstate NEW -j ACCEPT 
+#iptables -A FORWARD -d 10.8.33.130 -s 172.16.0.1 --sport 22  -j ACCEPT
+#iptables -A FORWARD  -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+echo 
+iptables -t nat -nvL
+
+}
+
+
+
+
+vm_or_host()
+{
+clear
+echo "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+echo "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+echo "%%               Select VM or Host                      %%"
+echo "%%                                                      %%"
+echo "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+echo "%%                                                      %%"
+echo "%%                   [1] VM (MIP)                       %%"
+echo "%%                                                      %%"
+echo "%%                   [2] Host (DIP)                     %%"
+echo "%%                                                      %%"
+echo "%%                                                      %%"
+echo "%%                   [x] Exit                           %%"
+echo "%%                                                      %%"
+echo "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+echo "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+echo ""
+read -p "Are you port forwarding to the host or a VM within the host?  " choice
+
+case $choice in
+        1) main_menu;;
+        2) hostPortfor;;
+        x|X) exit;;
+esac
+}
+vm_or_host

@@ -1,0 +1,241 @@
+#!/bin/sh
+
+#Info
+#====
+#	file: set_networking
+# 	name: RHEL-7 Networking Script
+
+#	version: 1.02
+# 		*version is major.minor format
+# 		*major is update when new capability is added
+# 		*minor is update on fixes & improvements
+
+#History
+#=======
+# 	02Dec2016 v1.00
+#		Dread Pirate( jason.roberts.14@us.af.mil )
+#		*Created to automate MIP setup on RHEL-7 for network connectivity and firewall rules
+
+#	09Dec2016 v1.01
+#		Dread Pirate( jason.roberts.14@us.af.mil )
+#		*added input validation for Mac address entries.
+
+#	20Dec2016 v1.02
+#		Czerwinski
+#		*Updated file header to standard format
+
+#	03Jan2017 v1.03
+#		Voss
+#		Czerwinski
+#		Wilds
+#		*Added input validation to ip_function
+
+#Description
+#===========
+#Sets networking information
+
+#Notes
+#=====
+
+
+######################
+#Script Variables
+netservice_restart=0
+MAC=0
+SET_EM1=/etc/sysconfig/network-scripts/ifcfg-em1
+######################
+
+
+#Check for running script as root
+checkroot()
+{
+	if [ `whoami` != "root" ]; then
+		echo "This Script must be run as root"
+		sleep 1
+		exit
+	fi
+}
+
+#Menu
+mainmenu()
+{
+	clear
+	echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+	echo "+                                                                      +"
+	echo "+                          Networking Setup                            +"
+	echo "+                                                                      +"
+	echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+	echo "+                                                                      +"
+	echo "+        [ 1 ] Mac Configuration                                       +"
+	echo "+                                                                      +"
+	echo "+                                                                      +"
+	echo "+        [ 2 ] IP Configuration                                        +"
+	echo "+                                                                      +"
+	echo "+                                                                      +"
+	echo "+        [ X ] Exit Script                                             +"
+	echo "+                                                                      +"
+	echo "+                                                                      +"
+	echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+	echo ""
+	read -p "Please make a Selection: " mainmenu_option
+
+	case $mainmenu_option in
+		1) clear && mac_func && mainmenu;;
+		2) clear && ip_func && mainmenu;;
+		x|X) break ;;
+		*) clear && echo "Invalid input" && sleep 1 && mainmenu;;
+	esac
+
+}
+
+#change ip settings
+ip_func()
+{
+	echo
+	read -p "Would you like to view or set ip settings? [v/s]  " ip_view_option
+	if [[ $ip_view_option == "v" ]]; then
+		ip addr
+		echo
+		if [[ $(ip addr show em1 | grep 'inet') ]]; then
+		        echo "em1 is up"
+		        read -p "Set em1 interface down? (y/n) " if_option
+		        if [[ $if_option == "y" ]]; then
+		                echo "Bringing em1 down..."
+		                ifdown em1
+		                if_option=""
+		        fi
+		else
+		        echo "em1 is down"
+		        read -p "Set em1 interface up? (y/n) " if_option
+		        if [[ $if_option == "y" ]]; then
+		                echo "Bringing em1 up..."
+		                ifup em1
+		                if_option=""
+		        fi
+		fi
+		read -p "Press enter to continue..... "
+		netservice_restart="n"
+	elif [[ $ip_view_option == "s" ]]; then
+		ip addr 
+		echo ""
+		ifdown em1
+		read -p "Use DHCP to connect? [y/n] " dhcp_option
+		echo "">$SET_EM1
+		MAC=$(ip -o link show dev em1 |grep -Po 'ether \K[^ ]*')
+		echo "HWADDR=$MAC">>$SET_EM1
+		echo "TYPE=Ethernet">>$SET_EM1
+		echo "DEFROUTE=yes">>$SET_EM1
+		echo "IPV4_FAILURE_FATAL=no">>$SET_EM1
+		echo "IPV6INIT=no">>$SET_EM1
+		echo "NAME=em1">>$SET_EM1
+		echo "DEVICE=em1">>$SET_EM1
+		echo "ONBOOT=no">>$SET_EM1
+
+		if [ $dhcp_option == "y" ]; then
+		        echo "BOOTPROTO=dhcp">>$SET_EM1
+		        echo "" 
+		        echo ""
+		        echo "Connecting to DHCP server after service restart.........."
+		        echo "" 
+		        echo "" 
+			netservice_restart="y"
+		elif [ $dhcp_option == "n" ]; then
+		        #get input from users
+			read -p "Enter the ipaddress you would like. [x.x.x.x] " ipaddr_option
+			until [ `echo $ipaddr_option | egrep "^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$"` ]; do
+			echo 
+			read  -p "$ipaddr_option is invalid. please try again: " ipaddr_option
+			done
+
+		        read -p "Enter the size of the network. [CIDR]  " cidr_option
+			until [ `echo $cidr_option | egrep "[0-32]"` ]; do
+			echo 
+			read  -p "$cidr_option is invalid. please try again: " cidr_option
+			done
+		        
+			read -p "Enter a gateway address. [x.x.x.x] " gateway_option
+			until [[ $gateway_option == "" || `echo $gateway_option | egrep "^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$"` ]]; do
+			echo 
+			read  -p "$gateway_option is invalid. please try again: " gateway_option
+			done
+		        
+			read -p "Enter a DNS server [x.x.x.x] " dns_option
+			until [[ $dns_option == "" || `echo $dns_option | egrep "^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$"` ]]; do
+			echo 
+			read  -p "$dns_option is invalid. please try again: " dns_option
+			done
+		
+		        echo "BOOTPROTO=none">>$SET_EM1
+			echo "IPADDR=$ipaddr_option">>$SET_EM1
+		        echo "GATEWAY=$gateway_option">>$SET_EM1
+		        echo "DNS1=$dns_option">>$SET_EM1
+		        echo "PREFIX=$cidr_option">>$SET_EM1
+			netservice_restart="y"
+		else
+		        echo "Invalid input!  Please enter a valid option... "
+		        ip_func
+		fi
+	else
+		echo "Invalid input!  Please enter a valid option... "
+		ip_func
+	fi
+	netservice
+}
+
+#netservice restart
+netservice ()
+{
+	if [ $netservice_restart == "y" ]; then
+		echo "Restarting Network Service....."
+		sudo service network restart
+		sleep 2
+		ifdown em1
+		ifup em1
+		sleep 2
+		netservice_restart="0"
+	fi
+}
+
+#this is used to validate the mac address entry. 
+macaddr_check()
+{
+	until [ `echo $macaddr_option | egrep "^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$"` ]; do
+       	echo 	
+	read -p  "$macaddr_option is invalid. please try again: " macaddr_option
+	done
+
+}
+#mac address change
+mac_func ()
+{
+	echo
+	read -p "Would you like to view or set the mac address? [v/s] " mac_option
+	if [ $mac_option == "s" ]; then
+		read -p "Would you like to reset the mac to default? [y/n] " RESET_OPTION
+		if [ $RESET_OPTION == "y" ]; then
+			sed -i "/.*MACADDR/d" $SET_EM1
+		elif [ $RESET_OPTION == "n" ]; then
+			read -p "What would you like the new mac address to be? [xx:xx:xx:xx:xx:xx] (Enter to reset) " macaddr_option
+			macaddr_check
+
+		if [ -z $(grep -i macaddr $SET_EM1) ]; then
+			echo "MACADDR=$macaddr_option">>$SET_EM1
+			else
+				sed -i "s/.*MACADDR.*/MACADDR=$macaddr_option/" $SET_EM1
+			fi
+		fi
+		netservice_restart="y"
+	elif [ $mac_option == "v" ]; then
+		echo ""
+		echo "em1 interface mac address:"
+		ip -o link show dev em1 |grep -Po 'ether \K[^ ]*' 
+		echo ""
+		read -p "Press enter to continue..... "
+	fi
+	netservice
+}
+
+
+#script functions
+checkroot
+mainmenu
